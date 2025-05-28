@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FE_HW2 — User Management</title>
+    <style>
+        :root {
+            --card-w: 560px;
+            --header-h: 80px;
+            --panel-h: 80px;
+            --stack-gap: 70px;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        #user-list {
+            position: relative;
+            width: var(--card-w);
+            margin: 0 auto;
+        }
+
+        .user {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: var(--card-w);
+            background: #fff;
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 -5px 24px rgba(0, 0, 0, 0.25);
+            overflow: visible;
+            transition: transform .25s ease, box-shadow .25s ease;
+            transform-origin: center bottom;
+        }
+
+        .user:hover {
+            transform: translateX(-50%) translateY(-10px) scale(1.03);
+            box-shadow: 0 10px 24px rgba(0,0,0,.25);
+            z-index: 1000;
+        }
+
+        .user h3, .user .username {
+            margin: 0;
+            text-align: center;
+            position: relative;
+            z-index: 3;
+        }
+
+        .user h3 {
+            font-size: 1.4rem;
+            padding: 16px 0 4px;
+        }
+
+        .user .username {
+            font-size: 1rem;
+            color: #555;
+            padding-bottom: 16px;
+        }
+
+        .actions {
+          position: absolute;
+          top: 3px;
+          right: 16px;
+          display: flex;
+          gap: 8px;
+          opacity: 0;
+          transform: translateY(100%);
+          transition: transform .25s ease, opacity .25s ease;
+          z-index: -1;
+        }
+
+        .user:hover .actions {
+            transform: translateY(-100%);
+            opacity: 1;
+            z-index: 1001;
+        }
+
+        .actions button {
+            padding: 6px 14px;
+            font-size: .75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .edit-btn {
+            background: #bdc3c7;
+            color: #333;
+        }
+
+        .edit-btn:hover {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .delete-btn {
+            background: #bdc3c7;
+            color: #333;
+        }
+
+        .delete-btn:hover {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .info-panel {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: var(--panel-h);
+            background: #fafafa;
+            border-top: 1px solid #eee;
+            border-radius: 0 0 12px 12px;
+            display: flex;
+            transform: translateY(100%);
+            transition: transform .25s ease;
+            box-shadow: 0 10px 84px rgba(0,0,0,.25);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .info-col {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            font-size: .9rem;
+        }
+
+        .info-col + .info-col {
+            border-left: 1px solid #ddd;
+        }
+
+        .info-col small {
+            display: block;
+            font-size: .7rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        #spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            margin: -20px 0 0 -20px;
+            border: 4px solid rgba(0,0,0,.1);
+            border-top: 4px solid #333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+            z-index: 2000;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #edit-form {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100%;
+            background: #fff;
+            box-shadow: -5px 0 15px rgba(0,0,0,.3);
+            padding: 20px;
+            transition: right .3s ease;
+            overflow-y: auto;
+            z-index: 3000;
+        }
+
+        #edit-form.open {
+            right: 0;
+        }
+
+        #edit-form h2 {
+            margin: 0 0 16px;
+        }
+
+        #edit-form input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        #save-btn {
+            width: 100%;
+            padding: 10px;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #save-btn:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>User List</h1>
+    <div id="spinner"></div>
+    <div id="user-list"></div>
+
+    <aside id="edit-form">
+        <h2>Edit User</h2>
+        <input id="edit-name" placeholder="Name">
+        <input id="edit-username" placeholder="Username">
+        <input id="edit-email" placeholder="Email">
+        <input id="edit-phone" placeholder="Phone">
+        <input id="edit-website" placeholder="Website">
+        <button id="save-btn">Save</button>
+    </aside>
+
+    <script>
+        const API = 'https://jsonplaceholder.typicode.com/users';
+        const list = document.getElementById('user-list');
+        const spinner = document.getElementById('spinner');
+        const form = document.getElementById('edit-form');
+        const saveBtn = document.getElementById('save-btn');
+        const inputs = {
+            name: document.getElementById('edit-name'),
+            username: document.getElementById('edit-username'),
+            email: document.getElementById('edit-email'),
+            phone: document.getElementById('edit-phone'),
+            website: document.getElementById('edit-website')
+        };
+
+        let users = [];
+        let current = null;
+
+        const show = () => spinner.style.display = 'block';
+        const hide = () => spinner.style.display = 'none';
+
+        async function init() {
+            show();
+            try {
+                const res = await fetch(API);
+                users = await res.json();
+                render(users);
+            } catch {
+                list.textContent = 'Load error';
+            } finally {
+                hide();
+            }
+        }
+
+        function render(arr) {
+            list.innerHTML = '';
+            const offset = 70;
+
+            arr.forEach((u, i) => {
+                const card = document.createElement('div');
+                card.className = 'user';
+                card.dataset.id = u.id;
+                card.style.top = `${i * offset}px`;
+
+                const h3 = document.createElement('h3');
+                h3.textContent = u.name;
+
+                const up = document.createElement('p');
+                up.className = 'username';
+                up.textContent = '@' + u.username;
+
+                const info = document.createElement('div');
+                info.className = 'info-panel';
+
+                ['phone', 'website', 'email'].forEach(k => {
+                    const col = document.createElement('div');
+                    col.className = 'info-col';
+                    col.innerHTML = `<small>${k}</small><br>${u[k]}`;
+                    info.append(col);
+                });
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-btn';
+                editBtn.textContent = 'Edit';
+                editBtn.onclick = () => edit(u);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'delete-btn';
+                delBtn.textContent = 'Delete';
+                delBtn.onclick = () => remove(u.id, card);
+
+                const actions = document.createElement('div');
+                actions.className = 'actions';
+                actions.append(editBtn, delBtn);
+
+                card.append(actions, h3, up, info);
+                list.append(card);
+            });
+        }
+
+        function edit(u) {
+            const actualUser = users.find(user => user.id === u.id) || u;
+            current = actualUser;
+            for (const k in inputs) {
+                inputs[k].value = actualUser[k] || '';
+            }
+            form.classList.add('open');
+        }
+
+        saveBtn.onclick = async () => {
+            if (!current) return;
+            const updatedData = {
+                ...current,
+                name: inputs.name.value,
+                username: inputs.username.value,
+                email: inputs.email.value,
+                phone: inputs.phone.value,
+                website: inputs.website.value
+            };
+
+            show();
+            try {
+                await fetch(`${API}/${current.id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(updatedData)
+                });
+
+                const userIndex = users.findIndex(u => u.id === current.id);
+                if (userIndex !== -1) {
+                    users[userIndex] = updatedData;
+                }
+
+                const card = list.querySelector(`.user[data-id="${current.id}"]`);
+                if (card) {
+                    card.querySelector('h3').textContent = updatedData.name;
+                    card.querySelector('.username').textContent = '@' + updatedData.username;
+
+                    const cols = card.querySelectorAll('.info-col');
+                    cols[0].innerHTML = `<small>phone</small><br>${updatedData.phone}`;
+                    cols[1].innerHTML = `<small>website</small><br>${updatedData.website}`;
+                    cols[2].innerHTML = `<small>email</small><br>${updatedData.email}`;
+                }
+
+            } catch {
+                alert('Update failed');
+            } finally {
+                hide();
+                form.classList.remove('open');
+            }
+        };
+
+        async function remove(id, card) {
+            if (!confirm('Delete user?')) return;
+            show();
+            try {
+                await fetch(`${API}/${id}`, {method: 'DELETE'});
+                users = users.filter(u => u.id !== id);
+                card.remove();
+            } catch {
+                alert('Delete failed');
+            } finally {
+                hide();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
